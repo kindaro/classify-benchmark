@@ -1,36 +1,44 @@
-{-# language BlockArguments #-}
+{-# language BlockArguments
+           , TypeApplications
+           , NoMonomorphismRestriction
+  #-}
 
 module Main where
 
 import Data.Function
-import qualified Data.Set as Set
 import qualified Data.List as List
-import Test.QuickCheck
+import Test.QuickCheck hiding ((===))
 import Criterion
 import Criterion.Main
 
 import qualified Classify
 import qualified Fischer
 
+equivalence :: Int -> Int -> Int -> Bool
+equivalence n = (==) `on` (`mod` n)
 
-classify' :: Ord a => (a -> a -> Bool) -> [a] -> [[a]]
-classify' eq = Set.toList . Set.map (Set.toList) . Classify.classifyBy eq . Set.fromDistinctAscList
-
-equivalence :: Int -> Int -> Bool
-equivalence = (==) `on` (`mod` 3)
-
-prepareList = List.nub . List.sort
-
-setupEnv = do
-    let xs  = [1.. 10^4]
+setupEnv n = do
+    xs <- fmap (take n) . generate $ (infiniteList @Int)
     return xs
 
+normalizeResult = List.sortBy (compare `on` head) . fmap List.sort
+
+(===) f g = \x -> f x == g x
+
 main = do
-    quickCheck \xs -> let xs' = prepareList xs
-                      in classify' equivalence xs' == Fischer.equivalenceClasses equivalence xs'
+    quickCheck $   (normalizeResult . Classify.classifyBy        (equivalence 3))
+               === (normalizeResult . Fischer.equivalenceClasses (equivalence 3))
     defaultMain
-        [ env setupEnv \xs -> bgroup ""
-            [ bench "classify" $ nf (classify'                  equivalence) xs
-            , bench "fischer"  $ nf (Fischer.equivalenceClasses equivalence) xs
+        [ env (setupEnv (2^22)) \xs -> bgroup "x"
+            [ bench "classify" $ nf (Classify.classifyBy        (equivalence 3)) xs
+            , bench "fischer"  $ nf (Fischer.equivalenceClasses (equivalence 3)) xs
+            ]
+        , env (setupEnv (2^16)) \xs -> bgroup "y"
+            [ bench "classify" $ nf (Classify.classifyBy        (equivalence (2^10))) xs
+            , bench "fischer"  $ nf (Fischer.equivalenceClasses (equivalence (2^10))) xs
+            ]
+        , env (setupEnv (2^12)) \xs -> bgroup "z"
+            [ bench "classify" $ nf (Classify.classifyBy        (==)) xs
+            , bench "fischer"  $ nf (Fischer.equivalenceClasses (==)) xs
             ]
         ]

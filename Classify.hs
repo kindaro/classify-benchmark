@@ -1,16 +1,16 @@
+{-# language ScopedTypeVariables #-}
+
 module Classify where
 
-import Data.Set (Set)
-import qualified Data.Set as Set
-import qualified Data.Map as Map
 import qualified Data.List as List
 
-classify :: Ord a => Set a -> Set (Set a)
+classify :: Ord a => [a] -> [[a]]
 classify = classifyBy (==)
 
-classifyBy :: Ord a => (a -> a -> Bool) -> Set a -> Set (Set a)
-classifyBy eq = Set.fromList . Map.elems . List.foldl' f Map.empty . Set.toList
+classifyBy :: forall a. Ord a => (a -> a -> Bool) -> [a] -> [[a]]
+classifyBy eq = List.foldl' f [ ]
   where
-    f m x = case List.find (`eq` x) (Map.keys m) of
-        Just k  -> Map.insertWith Set.union k (Set.singleton x) m
-        Nothing -> Map.insert x (Set.singleton x) m
+    f :: [[a]] -> a -> [[a]]
+    f [ ] y = [[y]]
+    f (xs@ (x: _): xss) y | x `eq` y  = (y: xs): xss
+                          | otherwise = xs: f xss y
