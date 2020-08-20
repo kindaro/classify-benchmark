@@ -7,7 +7,7 @@ module Main where
 
 import Data.Function
 import qualified Data.List as List
-import Test.QuickCheck hiding ((===))
+import Test.QuickCheck
 import Criterion
 import Criterion.Main
 
@@ -21,24 +21,20 @@ setupEnv n = do
     xs <- fmap (take n) . generate $ (infiniteList @Int)
     return xs
 
+installation n k = env (setupEnv (2^n)) \xs -> bgroup message
+  [ bench1 "classify" Classify.classifyBy xs
+  , bench1 "fischer" Fischer.equivalenceClasses xs
+  ]
+  where
+    message = "list length 2^" ++ show n ++ " = " ++ show (2^n)
+      ++ ", " ++ show k ++ " classes "
+    bench1 name f x = bench name  $ nf (f (equivalence k)) x
+
 normalizeResult = List.sortBy (compare `on` head) . fmap List.sort
 
-(===) f g = \x -> f x == g x
+(=->) f g = \x -> f x === g x
 
 main = do
     quickCheck $   (normalizeResult . Classify.classifyBy        (equivalence 3))
-               === (normalizeResult . Fischer.equivalenceClasses (equivalence 3))
-    defaultMain
-        [ env (setupEnv (2^22)) \xs -> bgroup "x"
-            [ bench "classify" $ nf (Classify.classifyBy        (equivalence 3)) xs
-            , bench "fischer"  $ nf (Fischer.equivalenceClasses (equivalence 3)) xs
-            ]
-        , env (setupEnv (2^16)) \xs -> bgroup "y"
-            [ bench "classify" $ nf (Classify.classifyBy        (equivalence (2^10))) xs
-            , bench "fischer"  $ nf (Fischer.equivalenceClasses (equivalence (2^10))) xs
-            ]
-        , env (setupEnv (2^12)) \xs -> bgroup "z"
-            [ bench "classify" $ nf (Classify.classifyBy        (==)) xs
-            , bench "fischer"  $ nf (Fischer.equivalenceClasses (==)) xs
-            ]
-        ]
+               =-> (normalizeResult . Fischer.equivalenceClasses (equivalence 3))
+    defaultMain $ fmap (uncurry installation) [ (lgN, 2^lgK) | lgN <- [10, 12..20], lgK <- [1, 3..9]]
